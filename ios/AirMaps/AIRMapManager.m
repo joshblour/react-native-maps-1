@@ -25,6 +25,8 @@
 #import "AIRMapCircle.h"
 #import "SMCalloutView.h"
 
+#import "FBClusteringManager.h"
+
 #import <MapKit/MapKit.h>
 
 static NSString *const RCTMapViewKey = @"MapView";
@@ -42,6 +44,7 @@ RCT_EXPORT_MODULE()
 {
     AIRMap *map = [AIRMap new];
     map.delegate = self;
+    
 
     // MKMapView doesn't report tap events, so we attach gesture recognizers to it
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleMapTap:)];
@@ -104,9 +107,7 @@ RCT_EXPORT_METHOD(animateToRegion:(nonnull NSNumber *)reactTag
         if (![view isKindOfClass:[AIRMap class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting AIRMap, got: %@", view);
         } else {
-            [AIRMap animateWithDuration:duration/1000 animations:^{
-                [(AIRMap *)view setRegion:region animated:YES];
-            }];
+            [(AIRMap *)view setRegion:region animated:YES];
         }
     }];
 }
@@ -124,9 +125,7 @@ RCT_EXPORT_METHOD(animateToCoordinate:(nonnull NSNumber *)reactTag
             MKCoordinateRegion region;
             region.span = mapView.region.span;
             region.center = latlng;
-            [AIRMap animateWithDuration:duration/1000 animations:^{
-                [mapView setRegion:region animated:YES];
-            }];
+            [mapView setRegion:region animated:YES];
         }
     }];
 }
@@ -227,6 +226,27 @@ RCT_EXPORT_METHOD(fitToElements:(nonnull NSNumber *)reactTag
 
 - (MKAnnotationView *)mapView:(__unused AIRMap *)mapView viewForAnnotation:(AIRMapMarker *)marker
 {
+    
+    if ([marker isKindOfClass:[FBAnnotationCluster class]]) {
+        FBAnnotationCluster *cluster = (FBAnnotationCluster *)marker;
+        NSLog(@"Annotation is cluster. Number of annotations in cluster: %lu", (unsigned long)cluster.annotations.count);
+
+        MKAnnotationView *m = [[MKAnnotationView alloc] initWithAnnotation:marker reuseIdentifier:@"default"];
+        
+        UILabel *labelView = [[UILabel alloc] initWithFrame:CGRectMake(m.center.x, m.center.y, 40, 40)];
+        [labelView setBackgroundColor:[UIColor colorWithRed:0.7294 green:0.7843 blue:0.1921 alpha:1.0]];
+        
+        labelView.layer.cornerRadius = labelView.frame.size.width / 2;
+        labelView.clipsToBounds = YES;
+        [labelView setText:[NSString stringWithFormat:@"%lu", (unsigned long)cluster.annotations.count]];
+        [labelView setTextAlignment:NSTextAlignmentCenter];
+        [m addSubview:labelView];
+        
+        // Also set center offset for annotation
+        [m setCenterOffset:CGPointMake(-20, -20)];
+        return m;
+    }
+    
     if (![marker isKindOfClass:[AIRMapMarker class]]) {
         return nil;
     }
@@ -355,6 +375,14 @@ static int kDragCenterContext;
 
     mapView.pendingCenter = mapView.region.center;
     mapView.pendingSpan = mapView.region.span;
+    
+    [[NSOperationQueue new] addOperationWithBlock:^{
+        double scale = mapView.bounds.size.width / mapView.visibleMapRect.size.width;
+        NSArray *annotations = [mapView.clusteringManager clusteredAnnotationsWithinMapRect:mapView.visibleMapRect withZoomScale:scale];
+        
+        [mapView.clusteringManager displayAnnotations:annotations onMapView:mapView];
+    }];
+
 }
 
 - (void)mapViewWillStartRenderingMap:(AIRMap *)mapView

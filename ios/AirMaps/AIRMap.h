@@ -13,6 +13,7 @@
 #import "RCTConvert+MapKit.h"
 #import "RCTComponent.h"
 #import "SMCalloutView.h"
+#import "FBClusteringManager.h"
 
 extern const CLLocationDegrees AIRMapDefaultSpan;
 extern const NSTimeInterval AIRMapRegionChangeObserveInterval;
@@ -32,7 +33,7 @@ extern const CGFloat AIRMapZoomBoundBuffer;
 
 @property (nonatomic, assign) CLLocationCoordinate2D pendingCenter;
 @property (nonatomic, assign) MKCoordinateSpan pendingSpan;
-
+@property (nonatomic, strong) FBClusteringManager *clusteringManager;
 
 @property (nonatomic, assign) BOOL ignoreRegionChanges;
 
