@@ -30,6 +30,8 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.Polyline;
+import com.google.maps.android.clustering.ClusterItem;
+import com.google.maps.android.clustering.ClusterManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +49,9 @@ public class AirMapView
     private boolean showUserLocation = false;
     private boolean isMonitoringRegion = false;
     private boolean isTouchDown = false;
+    private boolean clusterMarkers = false;
+
+    private ClusterManager<AirMapMarker> mClusterManager;
 
     private ArrayList<AirMapFeature> features = new ArrayList<>();
     private HashMap<Marker, AirMapMarker> markerMap = new HashMap<>();
@@ -107,6 +112,8 @@ public class AirMapView
         this.map = map;
         this.map.setInfoWindowAdapter(this);
         this.map.setOnMarkerDragListener(this);
+
+        this.mClusterManager = new ClusterManager<AirMapMarker>(this.getContext(), map);
 
         manager.pushEvent(this, "onMapReady", new WritableNativeMap());
 
@@ -231,6 +238,10 @@ public class AirMapView
         map.setMyLocationEnabled(showUserLocation);
     }
 
+    public void setClusterMarkers(boolean clusterMarkers) {
+        this.clusterMarkers = clusterMarkers;
+    }
+
     public void addFeature(View child, int index) {
         // Our desired API is to pass up annotations/overlays as children to the mapview component.
         // This is where we intercept them and do the appropriate underlying mapview action.
@@ -240,6 +251,7 @@ public class AirMapView
             features.add(index, annotation);
             Marker marker = (Marker)annotation.getFeature();
             markerMap.put(marker, annotation);
+            mClusterManager.addItem(annotation);
         } else if (child instanceof AirMapPolyline) {
             AirMapPolyline polylineView = (AirMapPolyline) child;
             polylineView.addToMap(map);
@@ -277,6 +289,7 @@ public class AirMapView
 
         if (feature instanceof AirMapMarker) {
             markerMap.remove(feature.getFeature());
+            mClusterManager.removeItem((AirMapMarker)feature.getFeature());
         } else if (feature instanceof AirMapPolyline) {
             polylineMap.remove(feature.getFeature());
         } else if (feature instanceof AirMapPolygon) {

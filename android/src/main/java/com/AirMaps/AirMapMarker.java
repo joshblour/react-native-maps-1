@@ -34,7 +34,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 import javax.annotation.Nullable;
 
-public class AirMapMarker extends AirMapFeature {
+public class AirMapMarker extends AirMapFeature implements ClusterItem{
 
     private MarkerOptions markerOptions;
     private Marker marker;
@@ -214,6 +214,11 @@ public class AirMapMarker extends AirMapFeature {
             markerOptions = createMarkerOptions();
         }
         return markerOptions;
+    }
+
+    @Override
+    public LatLng getPosition() {
+        return position;
     }
 
     @Override

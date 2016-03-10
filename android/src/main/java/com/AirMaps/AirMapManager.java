@@ -104,6 +104,11 @@ public class AirMapManager extends ViewGroupManager<AirMapView> {
         view.setShowsUserLocation(showUserLocation);
     }
 
+    @ReactProp(name="clusterMarkers", defaultBoolean = false)
+    public void setClusterMarkers(AirMapView view, boolean clusterMarkers) {
+        view.setClusterMarkers(clusterMarkers);
+    }
+
     @ReactProp(name="showsTraffic", defaultBoolean = false)
     public void setShowTraffic(AirMapView view, boolean showTraffic) {
         view.map.setTrafficEnabled(showTraffic);
