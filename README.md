@@ -31,8 +31,9 @@ declaratively controlling features on the map.
 
 ### Rendering a Map with an initial region
 
+## MapView
 ```jsx
-  <MapView 
+  <MapView
     initialRegion={{
       latitude: 37.78825,
       longitude: -122.4324,
@@ -311,5 +312,51 @@ render() {
 }
 ```
 
+### Troubleshooting
 
+#### My map is blank
 
+* Make sure that you have [properly installed](docs/installation.md) react-native-maps.
+* Check in the logs if there is more informations about the issue.
+* Try setting the style of the MapView to an absolute position with top, left, right and bottom values set.
+
+```javascript
+const styles = StyleSheet.create({
+  map: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+});
+```
+
+```jsx
+<MapView
+  style={styles.map}
+  // other props
+/>
+```
+
+#### Inputs don't focus
+
+* When inputs don't focus or elements don't respond to tap, look at the order of the view hierarchy, sometimes the issue could be due to ordering of rendered components, prefer putting MapView as the first component.
+
+Bad:
+
+```jsx
+<View>
+  <TextInput/>
+  <MapView/>
+</View>
+```
+
+Good:
+
+```jsx
+<View>
+  <MapView/>
+  <TextInput/>
+</View>
+```

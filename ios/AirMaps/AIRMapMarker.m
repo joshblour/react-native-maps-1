@@ -219,5 +219,13 @@
                                                           }];
 }
 
+- (void)setPinColor:(UIColor *)pinColor
+{
+    _pinColor = pinColor;
+    
+    if ([_pinView respondsToSelector:@selector(setPinTintColor:)]) {
+        _pinView.pinTintColor = _pinColor;
+    }
+}
 
 @end

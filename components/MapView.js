@@ -84,6 +84,13 @@ var MapView = React.createClass({
     scrollEnabled: PropTypes.bool,
 
     /**
+     * If `false` the user won't be able to adjust the camera’s pitch angle.
+     * Default value is `true`.
+     *
+     */
+    pitchEnabled: PropTypes.bool,
+
+    /**
      * A Boolean indicating whether the map shows scale information.
      * Default value is `false`
      *
@@ -116,11 +123,13 @@ var MapView = React.createClass({
      * - standard: standard road map (default)
      * - satellite: satellite view
      * - hybrid: satellite view with roads and points of interest overlayed
+     * - terrain: (Android only) topographic view
      */
     mapType: PropTypes.oneOf([
       'standard',
       'satellite',
       'hybrid',
+      'terrain',
     ]),
 
     /**
@@ -361,6 +370,9 @@ var MapView = React.createClass({
         onMapReady: this._onMapReady,
         onLayout: this._onLayout,
       };
+      if (Platform.OS === 'ios' && props.mapType === 'terrain') {
+        props.mapType = 'standard';
+      }
     } else {
       props = {
         region: null,
