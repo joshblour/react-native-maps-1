@@ -9,13 +9,13 @@
 
 #import "AIRMapMarker.h"
 
-#import "RCTEventDispatcher.h"
-#import "UIView+React.h"
-#import "RCTBridge.h"
-#import "RCTUtils.h"
-#import "RCTImageLoader.h"
+#import <React/RCTBridge.h>
+#import <React/RCTEventDispatcher.h>
+#import <React/RCTImageLoader.h>
+#import <React/RCTUtils.h>
+#import <React/UIView+React.h>
 
-@implementation EmptyCalloutBackgroundView
+@implementation AIREmptyCalloutBackgroundView
 @end
 
 @implementation AIRMapMarker {
@@ -53,7 +53,7 @@
     if ([subview isKindOfClass:[AIRMapCallout class]]) {
         self.calloutView = (AIRMapCallout *)subview;
     } else {
-        [super insertReactSubview:subview atIndex:atIndex];
+        [super insertReactSubview:(UIView *)subview atIndex:atIndex];
     }
 }
 
@@ -61,7 +61,7 @@
     if ([subview isKindOfClass:[AIRMapCallout class]] && self.calloutView == subview) {
         self.calloutView = nil;
     } else {
-        [super removeReactSubview:subview];
+        [super removeReactSubview:(UIView *)subview];
     }
 }
 
@@ -71,10 +71,12 @@
         // In this case, we want to render a platform "default" marker.
         if (_pinView == nil) {
             _pinView = [[MKPinAnnotationView alloc] initWithAnnotation:self reuseIdentifier: nil];
+            [self addGestureRecognizerToView:_pinView];
             _pinView.annotation = self;
         }
 
         _pinView.draggable = self.draggable;
+        _pinView.layer.zPosition = self.zIndex;
 
         // TODO(lmr): Looks like this API was introduces in iOS 8. We may want to handle differently for earlier
         // versions. Right now it's just leaving it with the default color. People needing the colors are free to
@@ -89,6 +91,7 @@
         // if it has a non-null image, it means we want to render a custom marker with the image.
         // In either case, we want to return the AIRMapMarker since it is both an MKAnnotation and an
         // MKAnnotationView all at the same time.
+        self.layer.zPosition = self.zIndex;
         return self;
     }
 }
@@ -110,7 +113,7 @@
         if (self.calloutView.tooltip) {
             // if tooltip is true, then the user wants their react view to be the "tooltip" as wwell, so we set
             // the background view to something empty/transparent
-            calloutView.backgroundView = [EmptyCalloutBackgroundView new];
+            calloutView.backgroundView = [AIREmptyCalloutBackgroundView new];
         } else {
             // the default tooltip look is wanted, and the user is just filling the content with their react subviews.
             // as a result, we use the default "masked" background view.
@@ -163,6 +166,56 @@
                                        animated:YES];
 }
 
+#pragma mark - Tap Gesture & Events.
+
+- (void)addTapGestureRecognizer {
+    [self addGestureRecognizerToView:nil];
+}
+
+- (void)addGestureRecognizerToView:(UIView *)view {
+    if (!view) {
+        view = self;
+    }
+    UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_handleTap:)];
+    // setting this to NO allows the parent MapView to continue receiving marker selection events
+    tapGestureRecognizer.cancelsTouchesInView = NO;
+    [view addGestureRecognizer:tapGestureRecognizer];
+}
+
+- (void)_handleTap:(UITapGestureRecognizer *)recognizer {
+    AIRMapMarker *marker = self;
+    if (!marker) return;
+    
+    if (marker.selected) {
+        CGPoint touchPoint = [recognizer locationInView:marker.map.calloutView];
+        if ([marker.map.calloutView hitTest:touchPoint withEvent:nil]) {
+            
+            // the callout got clicked, not the marker
+            id event = @{
+                         @"action": @"callout-press",
+                         };
+            
+            if (marker.onCalloutPress) marker.onCalloutPress(event);
+            if (marker.calloutView && marker.calloutView.onPress) marker.calloutView.onPress(event);
+            if (marker.map.onCalloutPress) marker.map.onCalloutPress(event);
+            return;
+        }
+    }
+    
+    // the actual marker got clicked
+    id event = @{
+                 @"action": @"marker-press",
+                 @"id": marker.identifier ?: @"unknown",
+                 @"coordinate": @{
+                         @"latitude": @(marker.coordinate.latitude),
+                         @"longitude": @(marker.coordinate.longitude)
+                         }
+                 };
+    
+    if (marker.onPress) marker.onPress(event);
+    if (marker.map.onMarkerPress) marker.map.onMarkerPress(event);
+}
+
 - (void)hideCalloutView
 {
     // hide the callout view
@@ -194,7 +247,12 @@
 
 - (BOOL)shouldUsePinView
 {
-    return self.subviews.count == 0 && !self.imageSrc;
+    return self.reactSubviews.count == 0 && !self.imageSrc;
+}
+
+- (void)setOpacity:(double)opacity
+{
+  [self setAlpha:opacity];
 }
 
 - (void)setImageSrc:(NSString *)imageSrc
@@ -205,29 +263,37 @@
         _reloadImageCancellationBlock();
         _reloadImageCancellationBlock = nil;
     }
-    _reloadImageCancellationBlock = [_bridge.imageLoader loadImageWithTag:_imageSrc
-                                                                     size:self.bounds.size
-                                                                    scale:RCTScreenScale()
-                                                               resizeMode:UIViewContentModeCenter
-                                                            progressBlock:nil
-                                                          completionBlock:^(NSError *error, UIImage *image) {
-                                                              if (error) {
-                                                                  // TODO(lmr): do something with the error?
-                                                                  NSLog(@"%@", error);
-                                                              }
-                                                              dispatch_async(dispatch_get_main_queue(), ^{
-                                                                self.image = image;
-                                                              });
-                                                          }];
+    _reloadImageCancellationBlock = [_bridge.imageLoader loadImageWithURLRequest:[RCTConvert NSURLRequest:_imageSrc]
+                                                                            size:self.bounds.size
+                                                                           scale:RCTScreenScale()
+                                                                         clipped:YES
+                                                                      resizeMode:RCTResizeModeCenter
+                                                                   progressBlock:nil
+                                                                partialLoadBlock:nil
+                                                                 completionBlock:^(NSError *error, UIImage *image) {
+                                                                     if (error) {
+                                                                         // TODO(lmr): do something with the error?
+                                                                         NSLog(@"%@", error);
+                                                                     }
+                                                                     dispatch_async(dispatch_get_main_queue(), ^{
+                                                                         self.image = image;
+                                                                     });
+                                                                 }];
 }
 
 - (void)setPinColor:(UIColor *)pinColor
 {
     _pinColor = pinColor;
-    
+
     if ([_pinView respondsToSelector:@selector(setPinTintColor:)]) {
         _pinView.pinTintColor = _pinColor;
     }
+}
+
+- (void)setZIndex:(NSInteger)zIndex
+{
+    _zIndex = zIndex;
+    self.layer.zPosition = _zIndex;
 }
 
 @end
